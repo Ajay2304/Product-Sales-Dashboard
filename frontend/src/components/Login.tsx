@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 const Login: React.FC = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,9 +17,7 @@ const Login: React.FC = () => {
     try {
       const response = await api.post('/auth/login', { username, password });
       localStorage.setItem('token', response.data.token);
-
-      // Full page reload to clear any dev state and go to dashboard
-      window.location.href = '/';
+      navigate('/');
     } catch (err: any) {
       const message =
         err.response?.data?.message ||
@@ -31,145 +31,46 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#f0f2f5',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      <div
-        style={{
-          padding: '40px',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          width: '420px',
-          maxWidth: '90%',
-        }}
-      >
-        <h2
-          style={{
-            textAlign: 'center',
-            marginBottom: '30px',
-            color: '#1a1a1a',
-            fontSize: '28px',
-            fontWeight: '600',
-          }}
-        >
-          Product & Sales Dashboard
-        </h2>
+    <div className="login-page">
+      <div className="auth-card">
+        <div className="auth-heading">
+          <h1>Product Sales Dashboard</h1>
+          <p>Sign in to manage products, orders, and business insights</p>
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '24px' }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: '600',
-                color: '#333',
-              }}
-            >
-              Username
-            </label>
+          <div className="field">
+            <label htmlFor="username">Username</label>
             <input
+              id="username"
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value.trim())}
+              onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="admin"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid #d9d9d9',
-                fontSize: '16px',
-                transition: 'border 0.2s',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = '#1890ff')}
-              onBlur={(e) => (e.target.style.borderColor = '#d9d9d9')}
             />
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: '600',
-                color: '#333',
-              }}
-            >
-              Password
-            </label>
+          <div className="field">
+            <label htmlFor="password">Password</label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="password"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid #d9d9d9',
-                fontSize: '16px',
-                transition: 'border 0.2s',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = '#1890ff')}
-              onBlur={(e) => (e.target.style.borderColor = '#d9d9d9')}
             />
           </div>
 
-          {error && (
-            <div
-              style={{
-                backgroundColor: '#fff2f0',
-                border: '1px solid #ffccc7',
-                color: '#cf1322',
-                padding: '12px',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                textAlign: 'center',
-                fontSize: '14px',
-              }}
-            >
-              {error}
-            </div>
-          )}
+          {error && <div className="alert-error">{error}</div>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              backgroundColor: '#1890ff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '18px',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              transition: 'all 0.2s',
-            }}
-          >
+          <button type="submit" disabled={loading} className="btn btn-primary btn-block">
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <p
-          style={{
-            textAlign: 'center',
-            marginTop: '30px',
-            color: '#666',
-            fontSize: '14px',
-          }}
-        >
+        <p className="auth-note">
           Default credentials: <strong>admin</strong> / <strong>password</strong>
         </p>
       </div>

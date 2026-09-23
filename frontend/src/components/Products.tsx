@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import api from '../services/api';
 
 interface Product {
@@ -10,60 +10,71 @@ interface Product {
   createdAt: string;
 }
 
+interface ProductResponse {
+  data: Product[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({ name: '', sku: '', price: '' });
 
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async (requestedPage: number, requestedSearch: string) => {
     try {
-      const response = await api.get('/products');
-      setProducts(response.data);
+      setLoading(true);
+      const response = await api.get<ProductResponse>('/products', {
+        params: {
+          page: requestedPage,
+          limit: itemsPerPage,
+          search: requestedSearch || undefined
+        }
+      });
+      setProducts(response.data.data);
+      setTotalPages(response.data.meta.totalPages || 1);
       setError('');
-    } catch (err: any) {
+    } catch (err) {
       setError('Failed to load products');
-      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const paginatedProducts = filteredProducts.slice(
-    (page - 1) * itemsPerPage,
-    page * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  useEffect(() => {
+    fetchProducts(page, search);
+  }, [fetchProducts, page, search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      name: formData.name.trim(),
+      sku: formData.sku.trim().toUpperCase(),
+      price: Number(formData.price)
+    };
+
     try {
       if (editingProduct) {
-        await api.put(`/products/${editingProduct._id}`, formData);
+        await api.put(`/products/${editingProduct._id}`, payload);
       } else {
-        await api.post('/products', formData);
+        await api.post('/products', payload);
       }
       setShowModal(false);
       setEditingProduct(null);
       setFormData({ name: '', sku: '', price: '' });
-      fetchProducts();
+      fetchProducts(page, search);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Operation failed');
     }
@@ -71,18 +82,24 @@ const Products: React.FC = () => {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    setFormData({ name: product.name, sku: product.sku, price: product.price.toString() });
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      price: product.price.toString()
+    });
     setShowModal(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Deactivate this product?')) {
-      try {
-        await api.delete(`/products/${id}`);
-        fetchProducts();
-      } catch (err) {
-        alert('Delete failed');
-      }
+    if (!window.confirm('Deactivate this product?')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/products/${id}`);
+      fetchProducts(page, search);
+    } catch (err) {
+      alert('Delete failed');
     }
   };
 
@@ -92,174 +109,131 @@ const Products: React.FC = () => {
     setShowModal(true);
   };
 
-  if (loading) return <div style={{ padding: '100px', textAlign: 'center' }}>Loading products...</div>;
-  if (error) return <div style={{ padding: '100px', textAlign: 'center', color: 'red' }}>{error}</div>;
+  if (loading) {
+    return <div className="section-state">Loading products...</div>;
+  }
+
+  if (error) {
+    return <div className="section-state section-error">{error}</div>;
+  }
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <h1 style={{ color: '#2c3e50' }}>Products Management</h1>
-        <button
-          onClick={openCreateModal}
-          style={{
-            background: '#52c41a',
-            color: 'white',
-            border: 'none',
-            padding: '12px 24px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
-        >
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1>Products</h1>
+          <p>Create, update, and manage your active catalog.</p>
+        </div>
+        <button onClick={openCreateModal} className="btn btn-success">
           + Add Product
         </button>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search by name or SKU..."
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        style={{
-          width: '100%',
-          padding: '12px',
-          marginBottom: '20px',
-          borderRadius: '8px',
-          border: '1px solid #d9d9d9',
-          fontSize: '16px'
-        }}
-      />
+      <div className="controls-row">
+        <input
+          type="text"
+          placeholder="Search by name or SKU..."
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
+        />
+      </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        <thead style={{ background: '#f8f9fa' }}>
-          <tr>
-            <th style={{ padding: '16px', textAlign: 'left' }}>Name</th>
-            <th style={{ padding: '16px', textAlign: 'left' }}>SKU</th>
-            <th style={{ padding: '16px', textAlign: 'left' }}>Price</th>
-            <th style={{ padding: '16px', textAlign: 'left' }}>Status</th>
-            <th style={{ padding: '16px', textAlign: 'center' }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginatedProducts.map((product) => (
-            <tr key={product._id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '16px' }}>{product.name}</td>
-              <td style={{ padding: '16px' }}>{product.sku}</td>
-              <td style={{ padding: '16px' }}>${product.price.toFixed(2)}</td>
-              <td style={{ padding: '16px' }}>
-                <span style={{
-                  padding: '6px 12px',
-                  borderRadius: '20px',
-                  background: product.isActive ? '#d4edda' : '#f8d7da',
-                  color: product.isActive ? '#155724' : '#721c24',
-                  fontSize: '14px'
-                }}>
-                  {product.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </td>
-              <td style={{ padding: '16px', textAlign: 'center' }}>
-                <button onClick={() => handleEdit(product)} style={{ marginRight: '10px', color: '#1890ff', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  Edit
-                </button>
-                <button onClick={() => handleDelete(product._id)} style={{ color: '#f5222d', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  Deactivate
-                </button>
-              </td>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>SKU</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {products.length === 0 && (
+              <tr>
+                <td colSpan={6} className="empty-cell">No matching products found.</td>
+              </tr>
+            )}
+            {products.map((product) => (
+              <tr key={product._id}>
+                <td>{product.name}</td>
+                <td>{product.sku}</td>
+                <td>${product.price.toFixed(2)}</td>
+                <td>
+                  <span className={product.isActive ? 'status-pill active' : 'status-pill inactive'}>
+                    {product.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td>{new Date(product.createdAt).toLocaleDateString()}</td>
+                <td>
+                  <div className="row-actions">
+                    <button type="button" className="link-btn" onClick={() => handleEdit(product)}>Edit</button>
+                    <button type="button" className="link-btn danger" onClick={() => handleDelete(product._id)}>Deactivate</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '30px' }}>
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i + 1}
-              onClick={() => setPage(i + 1)}
-              style={{
-                padding: '10px 16px',
-                background: page === i + 1 ? '#1890ff' : '#f0f0f0',
-                color: page === i + 1 ? 'white' : '#333',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="pagination">
+        <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={page === 1}>
+          Previous
+        </button>
+        <span>Page {page} of {totalPages}</span>
+        <button type="button" onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} disabled={page === totalPages}>
+          Next
+        </button>
+      </div>
 
-      {/* Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '30px',
-            borderRadius: '12px',
-            width: '500px',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
-          }}>
-            <h2 style={{ marginBottom: '20px' }}>
-              {editingProduct ? 'Edit Product' : 'Create New Product'}
-            </h2>
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2>{editingProduct ? 'Edit Product' : 'Create Product'}</h2>
             <form onSubmit={handleSubmit}>
-              <input
-                type="text"
-                placeholder="Product Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                style={{ width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #ccc' }}
-              />
-              <input
-                type="text"
-                placeholder="SKU (Unique)"
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                required
-                style={{ width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #ccc' }}
-              />
-              <input
-                type="number"
-                placeholder="Price"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                required
-                min="0.01"
-                step="0.01"
-                style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '6px', border: '1px solid #ccc' }}
-              />
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="submit" style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: '#1890ff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}>
+              <div className="field">
+                <label htmlFor="name">Name</label>
+                <input
+                  id="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="sku">SKU</label>
+                <input
+                  id="sku"
+                  type="text"
+                  value={formData.sku}
+                  onChange={(event) => setFormData({ ...formData, sku: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="price">Price</label>
+                <input
+                  id="price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(event) => setFormData({ ...formData, price: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="submit" className="btn btn-primary">
                   {editingProduct ? 'Update' : 'Create'}
                 </button>
-                <button type="button" onClick={() => setShowModal(false)} style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: '#f0f0f0',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}>
+                <button type="button" className="btn btn-muted" onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
               </div>

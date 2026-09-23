@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -10,68 +10,27 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <nav style={{
-      backgroundColor: '#2c3e50',
-      padding: '15px 40px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000
-    }}>
-      <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
-        <h2 style={{ color: '#ecf0f1', margin: 0, cursor: 'pointer' }} onClick={() => navigate('/')}>
-          Sales Dashboard
+    <nav className="app-navbar">
+      <div className="app-navbar-left">
+        <h2 className="app-brand" onClick={() => navigate('/')}>
+          Product Sales Suite
         </h2>
-        <button
-          onClick={() => navigate('/')}
-          style={navButtonStyle(true)}
-        >
+        <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
           Dashboard
-        </button>
-        <button
-          onClick={() => navigate('/products')}
-          style={navButtonStyle(false)}
-        >
+        </NavLink>
+        <NavLink to="/products" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           Products
-        </button>
-        <button
-          onClick={() => navigate('/orders')}
-          style={navButtonStyle(false)}
-        >
+        </NavLink>
+        <NavLink to="/orders" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           Orders
-        </button>
+        </NavLink>
       </div>
 
-      <button
-        onClick={handleLogout}
-        style={{
-          backgroundColor: '#e74c3c',
-          color: 'white',
-          border: 'none',
-          padding: '10px 20px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          fontSize: '16px'
-        }}
-      >
+      <button onClick={handleLogout} className="btn btn-danger btn-sm">
         Logout
       </button>
     </nav>
   );
 };
-
-const navButtonStyle = (active: boolean) => ({
-  backgroundColor: active ? '#3498db' : 'transparent',
-  color: 'white',
-  border: 'none',
-  padding: '10px 20px',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  fontSize: '16px',
-  fontWeight: active ? 'bold' : 'normal' as any
-});
 
 export default Navbar;

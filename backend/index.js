@@ -4,49 +4,59 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Middleware
+if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
+  console.error('Missing required environment variables: MONGO_URI and JWT_SECRET');
+  process.exit(1);
+}
+
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected successfully! 🎉'))
-  .catch(err => {
+  .then(() => console.log('MongoDB connected successfully'))
+  .catch((err) => {
     console.error('MongoDB connection error:', err);
     process.exit(1);
   });
 
-// JWT Protection Middleware (load it early)
 const authenticateJWT = require('./middlewares/auth');
 
-// Apply protection FIRST for protected routes
 app.use('/products', authenticateJWT);
 app.use('/orders', authenticateJWT);
 app.use('/dashboard', authenticateJWT);
 
-// Now register routes
-app.use('/auth', require('./routes/auth'));                    // Public
-app.use('/products', require('./routes/products'));            // Protected
-app.use('/orders', require('./routes/orders'));                // Protected
-app.use('/dashboard', require('./routes/dashboard'));          // Protected
+app.use('/auth', require('./routes/auth'));
+app.use('/products', require('./routes/products'));
+app.use('/orders', require('./routes/orders'));
+app.use('/dashboard', require('./routes/dashboard'));
 
-// Public test route
 app.get('/', (req, res) => {
-  res.send(`
-    <h1>Product & Sales Management Dashboard Backend 🚀</h1>
-    <p><strong>Public:</strong> POST /auth/login</p>
-    <p><strong>Protected:</strong></p>
-    <ul>
-      <li>GET/POST/PUT/DELETE /products</li>
-      <li>GET/POST /orders</li>
-      <li>GET /dashboard/summary</li>
-    </ul>
-    <p>Backend is running perfectly!</p>
-  `);
+  res.json({
+    service: 'Product Sales Dashboard API',
+    status: 'ok',
+    endpoints: {
+      public: ['POST /auth/login'],
+      protected: ['GET/POST/PUT/DELETE /products', 'GET/POST /orders', 'GET /dashboard/summary']
+    }
+  });
 });
 
-const PORT = process.env.PORT || 5000;
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+app.use((req, res) => {
+  res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ message: 'Internal server error' });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
